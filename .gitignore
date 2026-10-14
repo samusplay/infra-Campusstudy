@@ -1,0 +1,18 @@
+# Secretos (contraseñas de BD, JWT)
+.env
+.env.*
+!.env.example
+
+# Datos locales si algún día montas volúmenes en carpetas
+data/
+volumes/
+*.log
+
+# IDEs
+.idea/
+.vscode/
+*.iml
+
+# Sistema operativo
+.DS_Store
+Thumbs.db
