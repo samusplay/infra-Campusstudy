@@ -77,6 +77,50 @@ services:
       sqlserver-materias:
         condition: service_healthy
 
+  # ---------- GRUPOS ----------
+  postgres-grupos:
+    image: postgres:16-alpine
+    container_name: postgres-grupos
+    environment:
+      POSTGRES_DB: ${GRUPOS_DB_NAME}
+      POSTGRES_USER: ${GRUPOS_DB_USER}
+      POSTGRES_PASSWORD: ${GRUPOS_DB_PASSWORD}
+    ports:
+      - "5433:5432"
+    volumes:
+      - pg-grupos-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${GRUPOS_DB_USER} -d ${GRUPOS_DB_NAME}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  grupos-service:
+    build:
+      context: ../GRUPOS-campusStudy/grupos-service
+      dockerfile: Dockerfile.dev
+    container_name: grupos-service
+    ports:
+      - "8082:8082"
+    volumes:
+      - ../GRUPOS-campusStudy/grupos-service:/app
+      - m2-cache:/root/.m2
+    environment:
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres-grupos:5432/${GRUPOS_DB_NAME}
+      - SPRING_DATASOURCE_USERNAME=${GRUPOS_DB_USER}
+      - SPRING_DATASOURCE_PASSWORD=${GRUPOS_DB_PASSWORD}
+      - APP_JWT_SECRET=${JWT_SECRET}
+      - MATERIAS_URL=http://materias-service:8006
+      - TZ=America/Bogota
+      - SPRING_DEVTOOLS_RESTART_ENABLED=true
+      - SPRING_DEVTOOLS_RESTART_POLL_INTERVAL=2s
+      - SPRING_DEVTOOLS_RESTART_QUIET_PERIOD=1s
+    depends_on:
+      postgres-grupos:
+        condition: service_healthy
+      materias-service:
+        condition: service_started
+
   # ---------- API GATEWAY ----------
   api-gateway:
     build:
@@ -90,13 +134,16 @@ services:
     environment:
       - USUARIOS_URL=http://users-auth:8081
       - MATERIAS_URL=http://materias-service:8006
+      - GRUPOS_URL=http://grupos-service:8082
       - JWT_SECRET=${JWT_SECRET}
       - WATCHFILES_FORCE_POLLING=true
     depends_on:
       - users-auth
       - materias-service
+      - grupos-service
 
 volumes:
   pg-auth-data:
   m2-cache:
   mssql-materias-data:
+  pg-grupos-data:
