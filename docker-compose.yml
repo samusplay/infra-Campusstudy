@@ -121,6 +121,52 @@ services:
       materias-service:
         condition: service_started
 
+  # ---------- TAREAS ----------
+  postgres-tareas:
+    image: postgres:16-alpine
+    container_name: postgres-tareas
+    environment:
+      POSTGRES_DB: ${TAREAS_DB_NAME}
+      POSTGRES_USER: ${TAREAS_DB_USER}
+      POSTGRES_PASSWORD: ${TAREAS_DB_PASSWORD}
+    ports:
+      - "5434:5432"
+    volumes:
+      - pg-tareas-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${TAREAS_DB_USER} -d ${TAREAS_DB_NAME}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  tareas-service:
+    build:
+      context: ../TareasService/TareasService
+      dockerfile: Dockerfile.dev
+    container_name: tareas-service
+    ports:
+      - "8001:8001"
+    volumes:
+      - ../TareasService/TareasService:/app
+      - /app/bin
+      - /app/obj
+    environment:
+      - ConnectionStrings__DefaultConnection=Host=postgres-tareas;Port=5432;Database=${TAREAS_DB_NAME};Username=${TAREAS_DB_USER};Password=${TAREAS_DB_PASSWORD}
+      - Jwt__Key=${JWT_SECRET}
+      - Servicios__Usuarios=http://users-auth:8081
+      - Servicios__Materias=http://materias-service:8006
+      - Servicios__Grupos=http://grupos-service:8082
+      - Servicios__Notificaciones=http://notificaciones-service:3000
+    depends_on:
+      postgres-tareas:
+        condition: service_healthy
+      users-auth:
+        condition: service_started
+      materias-service:
+        condition: service_started
+      grupos-service:
+        condition: service_started
+
   # ---------- API GATEWAY ----------
   api-gateway:
     build:
@@ -135,15 +181,18 @@ services:
       - USUARIOS_URL=http://users-auth:8081
       - MATERIAS_URL=http://materias-service:8006
       - GRUPOS_URL=http://grupos-service:8082
+      - TAREAS_URL=http://tareas-service:8001
       - JWT_SECRET=${JWT_SECRET}
       - WATCHFILES_FORCE_POLLING=true
     depends_on:
       - users-auth
       - materias-service
       - grupos-service
+      - tareas-service
 
 volumes:
   pg-auth-data:
   m2-cache:
   mssql-materias-data:
   pg-grupos-data:
+  pg-tareas-data:
