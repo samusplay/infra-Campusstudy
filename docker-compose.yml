@@ -157,6 +157,7 @@ services:
       - Servicios__Materias=http://materias-service:8006
       - Servicios__Grupos=http://grupos-service:8082
       - Servicios__Notificaciones=http://notificaciones-service:3000
+      - Servicios__Estadisticas=http://estadisticas-service:8003
     depends_on:
       postgres-tareas:
         condition: service_healthy
@@ -166,6 +167,85 @@ services:
         condition: service_started
       grupos-service:
         condition: service_started
+      notificaciones-service:
+        condition: service_started
+      estadisticas-service:
+        condition: service_started
+
+  # ---------- NOTIFICACIONES ----------
+  mongo-notificaciones:
+    image: mongo:7
+    container_name: mongo-notificaciones
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${NOTIF_DB_USER}
+      MONGO_INITDB_ROOT_PASSWORD: ${NOTIF_DB_PASSWORD}
+      MONGO_INITDB_DATABASE: ${NOTIF_DB_NAME}
+    ports:
+      - "27018:27017"   # 27018 en tu PC: no choca con un MongoDB instalado en Windows
+    volumes:
+      - mongo-notificaciones-data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+  notificaciones-service:
+    build:
+      context: ../Notification_Service
+      dockerfile: Dockerfile.dev
+    container_name: notificaciones-service
+    ports:
+      - "3000:3000"
+    volumes:
+      - ../Notification_Service:/app
+      - /app/node_modules
+    environment:
+      - MONGODB_URI=mongodb://${NOTIF_DB_USER}:${NOTIF_DB_PASSWORD}@mongo-notificaciones:27017/${NOTIF_DB_NAME}?authSource=admin
+      - JWT_SECRET=${JWT_SECRET}
+      - TZ=America/Bogota
+      - TSC_WATCHFILE=DynamicPriorityPolling
+      - TSC_WATCHDIRECTORY=RecursiveDirectoryUsingDynamicPriorityPolling
+    depends_on:
+      mongo-notificaciones:
+        condition: service_healthy
+
+  # ---------- ESTADISTICAS ----------
+  postgres-estadisticas:
+    image: postgres:16-alpine
+    container_name: postgres-estadisticas
+    environment:
+      POSTGRES_DB: ${ESTADISTICAS_DB_NAME}
+      POSTGRES_USER: ${ESTADISTICAS_DB_USER}
+      POSTGRES_PASSWORD: ${ESTADISTICAS_DB_PASSWORD}
+    ports:
+      - "5435:5432"
+    volumes:
+      - pg-estadisticas-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${ESTADISTICAS_DB_USER} -d ${ESTADISTICAS_DB_NAME}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  estadisticas-service:
+    build:
+      context: ../Estadisticas_CampusStudy
+      dockerfile: Dockerfile.dev
+    container_name: estadisticas-service
+    ports:
+      - "8003:8003"
+    volumes:
+      - ../Estadisticas_CampusStudy:/app
+    environment:
+      - DATABASE_URL=postgresql+psycopg://${ESTADISTICAS_DB_USER}:${ESTADISTICAS_DB_PASSWORD}@postgres-estadisticas:5432/${ESTADISTICAS_DB_NAME}
+      - JWT_SECRET=${JWT_SECRET}
+      - TZ=America/Bogota
+      - WATCHFILES_FORCE_POLLING=true
+    depends_on:
+      postgres-estadisticas:
+        condition: service_healthy
 
   # ---------- API GATEWAY ----------
   api-gateway:
@@ -182,6 +262,8 @@ services:
       - MATERIAS_URL=http://materias-service:8006
       - GRUPOS_URL=http://grupos-service:8082
       - TAREAS_URL=http://tareas-service:8001
+      - NOTIFICACIONES_URL=http://notificaciones-service:3000
+      - ESTADISTICAS_URL=http://estadisticas-service:8003
       - JWT_SECRET=${JWT_SECRET}
       - WATCHFILES_FORCE_POLLING=true
     depends_on:
@@ -189,6 +271,8 @@ services:
       - materias-service
       - grupos-service
       - tareas-service
+      - notificaciones-service
+      - estadisticas-service
 
 volumes:
   pg-auth-data:
@@ -196,3 +280,5 @@ volumes:
   mssql-materias-data:
   pg-grupos-data:
   pg-tareas-data:
+  mongo-notificaciones-data:
+  pg-estadisticas-data:
