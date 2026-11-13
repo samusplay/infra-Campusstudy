@@ -275,6 +275,21 @@ services:
       - notificaciones-service
       - estadisticas-service
 
+  # ---------- PRUEBAS E2E (solo con --profile tests) ----------
+  tests:
+    build:
+      context: ../tests-campusstudy
+      dockerfile: Dockerfile.dev
+    container_name: tests-e2e
+    profiles: ["tests"]
+    volumes:
+      - ../tests-campusstudy:/suite
+    environment:
+      - GATEWAY_URL=http://api-gateway:8000
+      - WATCHFILES_FORCE_POLLING=true
+    depends_on:
+      - api-gateway
+
 volumes:
   pg-auth-data:
   m2-cache:
