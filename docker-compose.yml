@@ -150,6 +150,7 @@ services:
       - ../TareasService/TareasService:/app
       - /app/bin
       - /app/obj
+      - /app/.git
     environment:
       - ConnectionStrings__DefaultConnection=Host=postgres-tareas;Port=5432;Database=${TAREAS_DB_NAME};Username=${TAREAS_DB_USER};Password=${TAREAS_DB_PASSWORD}
       - Jwt__Key=${JWT_SECRET}
